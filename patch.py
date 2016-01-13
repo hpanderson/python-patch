@@ -2,7 +2,7 @@
 """
     Patch utility to apply unified diffs
 
-    Brute-force line-by-line non-recursive parsing 
+    Brute-force line-by-line non-recursive parsing
 
     Copyright (c) 2008-2015 anatoly techtonik
     Available under the terms of MIT license
@@ -18,8 +18,8 @@ import copy
 import logging
 import re
 # cStringIO doesn't support unicode in 2.5
-from StringIO import StringIO
-import urllib2
+from io import StringIO
+import urllib
 
 from os.path import exists, isfile, abspath
 import os
@@ -135,7 +135,7 @@ def fromfile(filename):
   """
   patchset = PatchSet()
   debug("reading %s" % filename)
-  fp = open(filename, "rb")
+  fp = open(filename, "r")
   res = patchset.parse(fp)
   fp.close()
   if res == True:
@@ -203,7 +203,7 @@ class Patch(object):
       If used as an iterable, returns hunks.
   """
   def __init__(self):
-    self.source = None 
+    self.source = None
     self.target = None
     self.hunks = []
     self.hunkends = []
@@ -278,7 +278,7 @@ class PatchSet(object):
           return False
 
         try:
-          self._lineno, self._line = super(wrapumerate, self).next()
+          self._lineno, self._line = super(wrapumerate, self).__next__()
         except StopIteration:
           self._exhausted = True
           self._line = False
@@ -309,7 +309,7 @@ class PatchSet(object):
 
     # regexp to match start of hunk, used groups - 1,3,4,6
     re_hunk_start = re.compile("^@@ -(\d+)(,(\d+))? \+(\d+)(,(\d+))? @@")
-    
+
     self.errors = 0
     # temp buffers for header and filenames info
     header = []
@@ -345,7 +345,7 @@ class PatchSet(object):
             else:
               info("%d unparsed bytes left at the end of stream" % len(''.join(header)))
               self.warnings += 1
-              # TODO check for \No new line at the end.. 
+              # TODO check for \No new line at the end..
               # TODO test for unparsed bytes
               # otherwise error += 1
             # this is actually a loop exit
@@ -378,7 +378,7 @@ class PatchSet(object):
               p.hunkends["lf"] += 1
             elif line.endswith("\r"):
               p.hunkends["cr"] += 1
-              
+
             if line.startswith("-"):
               hunkactual["linessrc"] += 1
             elif line.startswith("+"):
@@ -474,7 +474,7 @@ class PatchSet(object):
           headscan = True
         else:
           if tgtname != None:
-            # XXX seems to be a dead branch  
+            # XXX seems to be a dead branch
             warning("skipping invalid patch - double target at line %d" % (lineno+1))
             self.errors += 1
             srcname = None
@@ -561,7 +561,7 @@ class PatchSet(object):
           warning("error: no patch data found!")
           return False
         else: # extra data at the end of file
-          pass 
+          pass
       else:
         warning("error: patch stream is incomplete!")
         self.errors += 1
@@ -587,7 +587,7 @@ class PatchSet(object):
     # --------
 
     self._normalize_filenames()
-    
+
     return (self.errors == 0)
 
   def _detect_type(self, p):
@@ -630,14 +630,14 @@ class PatchSet(object):
             return GIT
 
     # HG check
-    # 
+    #
     #  - for plain HG format header is like "diff -r b2d9961ff1f5 filename"
     #  - for Git-style HG patches it is "diff --git a/oldname b/newname"
     #  - filename starts with a/, b/ or is equal to /dev/null
     #  - exported changesets also contain the header
     #    # HG changeset patch
     #    # User name@example.com
-    #    ...   
+    #    ...
     # TODO add MQ
     # TODO add revision info
     if len(p.header) > 0:
@@ -660,7 +660,7 @@ class PatchSet(object):
 
         [x] always use forward slashes to be crossplatform
             (diff/patch were born as a unix utility after all)
-        
+
         return None
     """
     if debugmode:
@@ -710,7 +710,7 @@ class PatchSet(object):
         if xisabs(p.target):
           warning("stripping absolute path from target name '%s'" % p.target)
           p.target = xstrip(p.target)
-    
+
       self.items[i].source = p.source
       self.items[i].target = p.target
 
@@ -766,7 +766,7 @@ class PatchSet(object):
         hist = "+"*int(iwidth) + "-"*int(dwidth)
       # -- /calculating +- histogram --
       output += (format % (names[i], insert[i] + delete[i], hist))
- 
+
     output += (" %d files changed, %d insertions(+), %d deletions(-), %+d bytes"
                % (len(names), sum(insert), sum(delete), delta))
     return output
@@ -967,7 +967,7 @@ class PatchSet(object):
 
   def _match_file_hunks(self, filepath, hunks):
     matched = True
-    fp = open(abspath(filepath))
+    fp = open(abspath(filepath), 'r')
 
     class NoMatch(Exception):
       pass
@@ -1007,7 +1007,7 @@ class PatchSet(object):
 
   def patch_stream(self, instream, hunks):
     """ Generator that yields stream patched with hunks iterable
-    
+
         Converts lineends in hunk lines to the best suitable format
         autodetected from input
     """
@@ -1060,14 +1060,14 @@ class PatchSet(object):
             yield line2write.rstrip("\r\n")+newline
           else: # newlines are mixed
             yield line2write
-     
+
     for line in instream:
       yield line
 
 
   def write_hunks(self, srcname, tgtname, hunks):
-    src = open(srcname, "rb")
-    tgt = open(tgtname, "wb")
+    src = open(srcname, "r")
+    tgt = open(tgtname, "w")
 
     debug("processing target file %s" % tgtname)
 
@@ -1083,13 +1083,13 @@ class PatchSet(object):
   def dump(self):
     for p in self.items:
       for headline in p.header:
-        print headline.rstrip('\n')
-      print '--- ' + p.source
-      print '+++ ' + p.target
+        print(headline.rstrip('\n'))
+      print('--- ' + p.source)
+      print('+++ ' + p.target)
       for h in p.hunks:
-        print '@@ -%s,%s +%s,%s @@' % (h.startsrc, h.linessrc, h.starttgt, h.linestgt)
+        print('@@ -%s,%s +%s,%s @@' % (h.startsrc, h.linessrc, h.starttgt, h.linestgt))
         for line in h.text:
-          print line.rstrip('\n')
+          print(line.rstrip('\n'))
 
 
 def main():
@@ -1145,7 +1145,7 @@ def main():
       patch = fromfile(patchfile)
 
   if options.diffstat:
-    print patch.diffstat()
+    print(patch.diffstat())
     sys.exit(0)
 
   #pprint(patch)
