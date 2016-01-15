@@ -259,17 +259,18 @@ class PatchSet(object):
     hunkactual = dict(linessrc=None, linestgt=None)
 
 
-    class wrapumerate(enumerate):
+    class wrapumerate:
       """Enumerate wrapper that uses boolean end of stream status instead of
       StopIteration exception, and properties to access line information.
       """
 
-      def __init__(self, *args, **kwargs):
-        # we don't call parent, it is magically created by __new__ method
+      def __init__(self, iterable):
 
         self._exhausted = False
         self._lineno = False     # after end of stream equal to the num of lines
         self._line = False       # will be reset to False after end of stream
+
+        self.en = enumerate(iterable)
 
       def next(self):
         """Try to read the next line and return True if it is available,
@@ -278,7 +279,7 @@ class PatchSet(object):
           return False
 
         try:
-          self._lineno, self._line = super(wrapumerate, self).__next__()
+          self._lineno, self._line = next(self.en)
         except StopIteration:
           self._exhausted = True
           self._line = False
